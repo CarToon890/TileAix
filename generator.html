@@ -136,9 +136,14 @@ canvas{
 
 
 
-<button onclick="generateTile()">Generate Tile</button>
-
-
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:20px;">
+  <button onclick="generateTile()" style="margin-top:0">Generate Tile</button>
+  <button onclick="document.getElementById('tileUploadInput').click()" style="margin-top:0;background:#444;">
+    📁 อัปโหลดลายกระเบื้อง
+  </button>
+  <input type="file" id="tileUploadInput" accept="image/png,image/jpeg" hidden>
+  <span id="tileUploadName" style="font-size:13px;color:#888;"></span>
+</div>
 
 </div>
 
@@ -192,7 +197,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const miniPreview = document.getElementById("roomMiniPreview");
         if (container && miniPreview) {
             container.style.display = "flex"; // สั่งให้แสดงผล
-            miniPreview.src = window.location.origin + roomImageUrl;
+            miniPreview.src = roomImageUrl;
             console.log("✅ Room image loaded:", roomImageUrl);
         }
     }
@@ -383,6 +388,24 @@ async function generateTile(){
  loadTexture(window.location.origin+data.tileUrl);
  document.getElementById("status").innerText="Success";
 }
+
+/* ================= TILE UPLOAD ================= */
+document.getElementById('tileUploadInput').addEventListener('change', function(){
+  const file = this.files[0];
+  if(!file) return;
+  if(!["image/jpeg","image/png"].includes(file.type)){
+    alert("รองรับเฉพาะ JPG และ PNG");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const dataUrl = e.target.result;
+    loadTexture(dataUrl);
+    document.getElementById("status").innerText = "อัปโหลดสำเร็จ: " + file.name;
+    document.getElementById("tileUploadName").textContent = file.name;
+  };
+  reader.readAsDataURL(file);
+});
 
 /* ================= RESTORE ================= */
 function restoreTexture(){

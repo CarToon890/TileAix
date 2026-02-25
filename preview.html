@@ -369,7 +369,6 @@ let roomImg       = null;
 let tileImg       = null;
 let points        = [];          // polygon vertices [{x,y}, ...]
 let polygonClosed = false;
-let scaleRatio    = 1;           // canvas pixel vs display pixel
 
 // ─── Settings ───
 let tileScale   = 1;
@@ -395,7 +394,7 @@ function init() {
 
   // Load room
   roomImg = new Image();
-  roomImg.crossOrigin = 'anonymous';
+  if (!roomSrc.startsWith('data:')) roomImg.crossOrigin = 'anonymous';
   roomImg.onload = () => {
     // set canvas to image natural size (max 1200 wide)
     const maxW = 1200;
@@ -406,7 +405,6 @@ function init() {
     overlay.height    = mainCanvas.height;
 
     drawRoom();
-    updateScaleRatio();
     setStatus('idle', 'คลิกบนรูปเพื่อเลือกพื้นที่พื้น');
   };
   roomImg.onerror = () => setStatus('idle', 'โหลดรูปห้องไม่ได้');
@@ -415,7 +413,7 @@ function init() {
   // Load tile
   if (tileSrc) {
     tileImg = new Image();
-    tileImg.crossOrigin = 'anonymous';
+    if (!tileSrc.startsWith('data:')) tileImg.crossOrigin = 'anonymous';
     tileImg.onload = () => {
       document.getElementById('tileThumb').src = tileImg.src;
       document.getElementById('tileSizeText').textContent = tileImg.naturalWidth + ' × ' + tileImg.naturalHeight + ' px';
@@ -425,11 +423,13 @@ function init() {
   }
 }
 
-function updateScaleRatio() {
-  const displayW = mainCanvas.getBoundingClientRect().width;
-  scaleRatio = mainCanvas.width / displayW;
+function getCanvasScale() {
+  const rect = overlay.getBoundingClientRect();
+  return {
+    x: overlay.width  / rect.width,
+    y: overlay.height / rect.height
+  };
 }
-window.addEventListener('resize', updateScaleRatio);
 
 /* ═══ DRAW ROOM ═══ */
 function drawRoom() {
@@ -450,8 +450,9 @@ overlay.addEventListener('click', (e) => {
   if (polygonClosed) return;  // already closed
 
   const rect = overlay.getBoundingClientRect();
-  const x = (e.clientX - rect.left) * scaleRatio;
-  const y = (e.clientY - rect.top)  * scaleRatio;
+  const scale = getCanvasScale();
+  const x = (e.clientX - rect.left) * scale.x;
+  const y = (e.clientY - rect.top)  * scale.y;
 
   points.push({ x, y });
   drawOverlay();
@@ -465,8 +466,9 @@ overlay.addEventListener('mousemove', (e) => {
   drawOverlay();
 
   const rect = overlay.getBoundingClientRect();
-  const mx = (e.clientX - rect.left) * scaleRatio;
-  const my = (e.clientY - rect.top)  * scaleRatio;
+  const scale = getCanvasScale();
+  const mx = (e.clientX - rect.left) * scale.x;
+  const my = (e.clientY - rect.top)  * scale.y;
 
   overlayCtx.beginPath();
   overlayCtx.moveTo(points[points.length - 1].x, points[points.length - 1].y);
@@ -570,6 +572,9 @@ function renderTiles() {
   const tileW = Math.round(tileImg.naturalWidth  * tileScale * 0.25);
   const tileH = Math.round(tileImg.naturalHeight * tileScale * 0.25);
   const gw = groutWidth;
+
+  // Bug fix: prevent infinite loop if tile size is 0
+  if (tileW <= 0 || tileH <= 0) return;
 
   mainCtx.save();
 
@@ -683,10 +688,14 @@ function downloadImage() {
   overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
 
   // create download
-  const link = document.createElement('a');
-  link.download = 'TileAI-Preview-' + Date.now() + '.png';
-  link.href = mainCanvas.toDataURL('image/png');
-  link.click();
+  try {
+    const link = document.createElement('a');
+    link.download = 'TileAI-Preview-' + Date.now() + '.png';
+    link.href = mainCanvas.toDataURL('image/png');
+    link.click();
+  } catch (err) {
+    alert('ไม่สามารถบันทึกได้: ' + err.message);
+  }
 
   // restore overlay
   overlayCtx.putImageData(overlayData, 0, 0);
