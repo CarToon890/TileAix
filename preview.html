@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Room Preview - TileAI</title>
+    <style>
+        body { font-family: sans-serif; background: #f3f3f3; text-align: center; padding: 40px; }
+        .preview-container { 
+            background: white; padding: 20px; border-radius: 15px; 
+            display: inline-block; box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+        }
+        canvas, #myImage { border-radius: 10px; max-width: 100%; height: auto; background: #eee; }
+        #myImage { display: none; margin: 0 auto; } /* ซ่อนไว้รอ AI */
+        .controls { margin-top: 20px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+        .btn { padding: 10px 25px; border-radius: 20px; border: none; cursor: pointer; text-decoration: none; font-size: 14px; }
+        .btn-back { background: #eee; color: #333; }
+        .btn-save { background: #1f4f8b; color: white; }
+        .btn-ai { background: #28a745; color: white; font-weight: bold; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <h1>Virtual Room Preview</h1>
+    <p>จำลองการปูกระเบื้องลงบนห้องของคุณ</p>
+
+    <div class="preview-container">
+        <canvas id="previewCanvas" width="800" height="500"></canvas>
+        
+        <img id="myImage" width="800" height="500">
+        
+        <div class="controls">
+            <a href="generator.html" class="btn btn-back">← กลับไปแก้ลาย</a>
+            
+            <button id="aiBtn" onclick="renderWithAI()" class="btn btn-ai">🪄 ปูพื้นด้วย AI (AI Smart Render)</button>
+            
+            <button onclick="downloadImage()" class="btn btn-save">บันทึกรูปภาพ</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('previewCanvas');
+        const ctx = canvas.getContext('2d');
+        const myImage = document.getElementById('myImage');
+
+        const roomSrc = localStorage.getItem('roomImage');
+        const tileSrc = localStorage.getItem('lastTexture');
+
+        // ฟังก์ชันวาด Canvas เบื้องต้น
+        async function renderPreview() {
+            if (!roomSrc || !tileSrc) {
+                alert("ไม่พบข้อมูลรูปห้องหรือลายกระเบื้อง");
+                return;
+            }
+
+            const roomImg = new Image();
+            roomImg.crossOrigin = "anonymous";
+            roomImg.src = window.location.origin + roomSrc;
+
+            roomImg.onload = () => {
+                ctx.drawImage(roomImg, 0, 0, 800, 500);
+
+                const tileImg = new Image();
+                tileImg.crossOrigin = "anonymous";
+                tileImg.src = tileSrc.startsWith('http') ? tileSrc : window.location.origin + tileSrc;
+
+                tileImg.onload = () => {
+                    ctx.save();
+                    ctx.globalAlpha = 0.5; // ปรับให้จางเพื่อให้เห็นห้อง
+                    const pattern = ctx.createPattern(tileImg, 'repeat');
+                    ctx.fillStyle = pattern;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.restore();
+                };
+            };
+        }
+
+        renderPreview();
+
+        // ฟังก์ชันเรียก AI
+        async function renderWithAI() {
+            const aiBtn = document.getElementById('aiBtn');
+            
+            aiBtn.innerText = "กำลังประมวลผล...";
+            aiBtn.disabled = true;
+
+            try {
+                const response = await fetch("/api/ai-preview", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        roomImageUrl: roomSrc,
+                        tileImageUrl: tileSrc
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.finalImage) {
+                    canvas.style.display = 'none';
+                    myImage.src = data.finalImage;
+                    myImage.style.display = 'block';
+                } else {
+                    alert("AI ไม่ได้ส่งรูปกลับมา ตรวจสอบการเชื่อมต่อ API");
+                }
+            } catch (err) {
+                console.error(err);
+                alert("AI ประมวลผลล้มเหลว ตรวจสอบ Server ของคุณ");
+            } finally {
+                aiBtn.innerText = "🪄 ปูพื้นด้วย AI (AI Smart Render)";
+                aiBtn.disabled = false;
+            }
+        }
+
+        // ฟังก์ชันดาวน์โหลดรูป
+        function downloadImage() {
+            const link = document.createElement('a');
+            link.download = 'tile-design-preview.png';
+            
+            // ถ้า AI โชว์รูปอยู่ ให้เซฟรูป AI ถ้าไม่ มีให้เซฟ Canvas
+            if (myImage.style.display === 'block') {
+                link.href = myImage.src;
+            } else {
+                link.href = canvas.toDataURL("image/png");
+            }
+            link.click();
+        }
+    </script>
+</body>
+</html>

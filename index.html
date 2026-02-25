@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home - TileAI</title>
+
+<style>
+    body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+    }
+
+    .navbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 40px;
+        background: #f5f5f5;
+    }
+
+    .logo {
+        font-size: 22px;
+        font-weight: bold;
+        color: #0a3c80;
+    }
+
+    .menu {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .menu span {
+        color: #333;
+        font-size: 14px;
+    }
+
+    .menu a {
+        text-decoration: none;
+        color: #0a3c80;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .menu a:hover {
+        text-decoration: underline;
+    }
+
+    .hero {
+        height: 80vh;
+        background-image: url('https://images.unsplash.com/photo-1505691938895-1758d7feb511');
+        background-size: cover;
+        background-position: center;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        color: #083b77;
+    }
+
+    .hero-content {
+        background: rgba(255,255,255,0.9);
+        padding: 40px;
+        border-radius: 15px;
+        max-width: 500px;
+    }
+
+    .hero h1 {
+        font-size: 36px;
+        margin-bottom: 20px;
+    }
+
+    .hero p {
+        font-size: 18px;
+        margin-bottom: 30px;
+    }
+
+    .hero button {
+        padding: 15px 40px;
+        font-size: 18px;
+        border-radius: 30px;
+        border: none;
+        background: #1f4f8b;
+        color: white;
+        cursor: pointer;
+    }
+
+    .hero button:hover {
+        background: #2c6bb2;
+    }
+
+    .steps {
+        background: #f0f0f0;
+        padding: 40px;
+        text-align: center;
+    }
+
+    .steps-container {
+        display: flex;
+        justify-content: center;
+        gap: 50px;
+        flex-wrap: wrap;
+    }
+
+    .step {
+        font-size: 20px;
+        color: #0a3c80;
+    }
+
+</style>
+</head>
+
+<body>
+
+<div class="navbar">
+    <div class="logo">✨ TileAI</div>
+    <div class="menu">
+        <span id="welcomeText"></span>
+        <a onclick="goHome()">Home</a>
+        <a onclick="logout()">Logout</a>
+    </div>
+</div>
+
+<div class="hero">
+    <div class="hero-content">
+        <h1>Design Your Dream Space with AI</h1>
+        <p>Create stunning interiors with intelligent tile design.</p>
+        <button onclick="startDesign()">Start Designing</button>
+    </div>
+</div>
+
+<div class="steps">
+    <div class="steps-container">
+        <div class="step">⬆ Upload</div>
+        <div class="step">💡 Type Idea</div>
+        <div class="step">🖼 Visualize</div>
+    </div>
+</div>
+
+<script>
+
+    // 🔐 ตรวจสอบ login แบบถูกต้อง
+    const userData = localStorage.getItem("user");
+
+    if (!userData) {
+        alert("กรุณา Login ก่อน");
+        window.location.href = "login.html";
+    } else {
+        try {
+            const user = JSON.parse(userData);
+
+            // แสดง email ด้านบน
+            document.getElementById("welcomeText").innerText =
+                "Welcome, " + user.email;
+
+        } catch (error) {
+            // ถ้า JSON พัง ล้างข้อมูลทิ้ง
+            localStorage.removeItem("user");
+            window.location.href = "login.html";
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem("user");
+        window.location.href = "login.html";
+    }
+
+    function startDesign() {
+        window.location.href = "upload.html";
+    }
+
+    function goHome() {
+        window.location.href = "index.html";
+    }
+
+</script>
+
+</body>
+</html>
