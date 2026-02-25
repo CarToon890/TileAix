@@ -1,129 +1,699 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
-    <title>Room Preview - TileAI</title>
-    <style>
-        body { font-family: sans-serif; background: #f3f3f3; text-align: center; padding: 40px; }
-        .preview-container { 
-            background: white; padding: 20px; border-radius: 15px; 
-            display: inline-block; box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
-        }
-        canvas, #myImage { border-radius: 10px; max-width: 100%; height: auto; background: #eee; }
-        #myImage { display: none; margin: 0 auto; } /* ซ่อนไว้รอ AI */
-        .controls { margin-top: 20px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
-        .btn { padding: 10px 25px; border-radius: 20px; border: none; cursor: pointer; text-decoration: none; font-size: 14px; }
-        .btn-back { background: #eee; color: #333; }
-        .btn-save { background: #1f4f8b; color: white; }
-        .btn-ai { background: #28a745; color: white; font-weight: bold; }
-        .btn:disabled { background: #ccc; cursor: not-allowed; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Room Preview - TileAI</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: 'DM Sans', 'IBM Plex Sans Thai', sans-serif;
+    background: #0f1117;
+    color: #e0e0e0;
+    min-height: 100vh;
+  }
+
+  /* ─── NAVBAR ─── */
+  .navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 32px;
+    background: rgba(15,17,23,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { font-weight: 700; font-size: 18px; color: #6c9fff; letter-spacing: -0.5px; }
+  .nav-steps { display: flex; gap: 6px; align-items: center; }
+  .nav-step {
+    padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 500;
+    background: rgba(255,255,255,0.04); color: #666;
+    transition: all .3s;
+  }
+  .nav-step.done { background: rgba(108,159,255,0.1); color: #6c9fff; }
+  .nav-step.active { background: #6c9fff; color: #0f1117; font-weight: 700; }
+
+  /* ─── LAYOUT ─── */
+  .main-layout {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 0;
+    height: calc(100vh - 53px);
+  }
+
+  /* ─── CANVAS AREA ─── */
+  .canvas-area {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #13151c;
+    overflow: hidden;
+  }
+  .canvas-wrapper {
+    position: relative;
+    display: inline-block;
+    max-width: 95%;
+    max-height: 90%;
+  }
+  #mainCanvas {
+    display: block;
+    max-width: 100%;
+    max-height: calc(100vh - 100px);
+    border-radius: 8px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  }
+  /* overlay canvas for polygon drawing */
+  #overlayCanvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    border-radius: 8px;
+    cursor: crosshair;
+  }
+
+  /* ─── STATUS BAR ─── */
+  .status-bar {
+    position: absolute;
+    bottom: 16px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 8px; align-items: center;
+    padding: 8px 18px;
+    background: rgba(15,17,23,0.9);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 30px;
+    font-size: 13px;
+    color: #aaa;
+    z-index: 10;
+  }
+  .status-dot { width:8px; height:8px; border-radius:50%; }
+  .status-dot.idle { background: #555; }
+  .status-dot.drawing { background: #f0c040; animation: pulse 1s infinite; }
+  .status-dot.done { background: #4caf50; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    background: #181a22;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .panel-header {
+    padding: 20px 20px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .panel-header h2 {
+    font-size: 15px; font-weight: 700; color: #fff;
+    margin-bottom: 4px;
+  }
+  .panel-header p { font-size: 12px; color: #666; }
+
+  .panel-section {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .panel-section h3 {
+    font-size: 11px; font-weight: 600; color: #6c9fff;
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+
+  /* ─── BUTTONS ─── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 6px; padding: 9px 16px; border-radius: 8px;
+    font-size: 13px; font-weight: 600; border: none;
+    cursor: pointer; transition: all .2s;
+    font-family: inherit;
+  }
+  .btn-primary { background: #6c9fff; color: #0f1117; }
+  .btn-primary:hover { background: #89b4ff; transform: translateY(-1px); }
+  .btn-danger { background: rgba(255,80,80,0.15); color: #ff6b6b; }
+  .btn-danger:hover { background: rgba(255,80,80,0.25); }
+  .btn-ghost { background: rgba(255,255,255,0.06); color: #aaa; }
+  .btn-ghost:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .btn-success { background: #2ea043; color: #fff; }
+  .btn-success:hover { background: #3bba52; }
+  .btn:disabled { opacity:.4; cursor:not-allowed; pointer-events:none; }
+
+  .btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* ─── RANGE SLIDERS ─── */
+  .slider-group { margin-bottom: 14px; }
+  .slider-label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: #888; margin-bottom: 6px;
+  }
+  .slider-label span:last-child {
+    background: rgba(255,255,255,0.06);
+    padding: 2px 8px; border-radius: 4px;
+    font-weight: 600; color: #ccc; font-size: 11px;
+  }
+  input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 4px;
+    background: rgba(255,255,255,0.1); border-radius: 4px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px;
+    background: #6c9fff; border-radius: 50%; cursor: pointer;
+    box-shadow: 0 0 8px rgba(108,159,255,0.4);
+  }
+
+  /* ─── COLOR INPUT ─── */
+  .color-input-wrap {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .color-input-wrap input[type="color"] {
+    -webkit-appearance: none; width: 32px; height: 32px;
+    border: 2px solid rgba(255,255,255,0.1); border-radius: 6px;
+    cursor: pointer; background: none;
+  }
+  .color-input-wrap input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+  .color-input-wrap input[type="color"]::-webkit-color-swatch { border-radius: 3px; border: none; }
+
+  /* ─── TILE PREVIEW THUMB ─── */
+  .tile-thumb {
+    width: 60px; height: 60px; border-radius: 8px;
+    border: 2px solid rgba(255,255,255,0.1);
+    object-fit: cover; background: #222;
+  }
+  .tile-info { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .tile-info-text { font-size: 12px; color: #888; }
+  .tile-info-text strong { display: block; color: #ddd; font-size: 13px; margin-bottom: 2px; }
+
+  /* ─── INSTRUCTIONS CARD ─── */
+  .instructions {
+    background: rgba(108,159,255,0.06);
+    border: 1px solid rgba(108,159,255,0.12);
+    border-radius: 8px; padding: 12px; margin-bottom: 6px;
+  }
+  .instructions ol {
+    padding-left: 18px; font-size: 12px; color: #8ab4ff;
+    line-height: 1.8;
+  }
+  .instructions li::marker { color: #6c9fff; font-weight: 700; }
+
+  /* ─── FOOTER ─── */
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 16px 20px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .sidebar-footer .btn { width: 100%; margin-bottom: 6px; }
+
+  /* ─── LAYOUT MODE SELECT ─── */
+  .layout-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .layout-option {
+    padding: 8px 4px;
+    text-align: center;
+    font-size: 11px;
+    color: #888;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .layout-option:hover { border-color: rgba(108,159,255,0.3); color: #bbb; }
+  .layout-option.active { border-color: #6c9fff; color: #6c9fff; background: rgba(108,159,255,0.08); }
+  .layout-option .icon { font-size: 18px; margin-bottom: 2px; }
+</style>
 </head>
 <body>
 
-    <h1>Virtual Room Preview</h1>
-    <p>จำลองการปูกระเบื้องลงบนห้องของคุณ</p>
+<!-- ═══ NAVBAR ═══ -->
+<div class="navbar">
+  <div class="logo">✦ TileAI</div>
+  <div class="nav-steps">
+    <div class="nav-step done" style="cursor:pointer" onclick="window.location.href='upload.html'">Upload</div>
+    <div class="nav-step done" style="cursor:pointer" onclick="window.location.href='generator.html'">Design</div>
+    <div class="nav-step active">Preview</div>
+  </div>
+</div>
 
-    <div class="preview-container">
-        <canvas id="previewCanvas" width="800" height="500"></canvas>
-        
-        <img id="myImage" width="800" height="500">
-        
-        <div class="controls">
-            <a href="generator.html" class="btn btn-back">← กลับไปแก้ลาย</a>
-            
-            <button id="aiBtn" onclick="renderWithAI()" class="btn btn-ai">🪄 ปูพื้นด้วย AI (AI Smart Render)</button>
-            
-            <button onclick="downloadImage()" class="btn btn-save">บันทึกรูปภาพ</button>
-        </div>
+<!-- ═══ MAIN ═══ -->
+<div class="main-layout">
+
+  <!-- LEFT: Canvas -->
+  <div class="canvas-area">
+    <div class="canvas-wrapper" id="canvasWrapper">
+      <canvas id="mainCanvas"></canvas>
+      <canvas id="overlayCanvas"></canvas>
     </div>
 
-    <script>
-        const canvas = document.getElementById('previewCanvas');
-        const ctx = canvas.getContext('2d');
-        const myImage = document.getElementById('myImage');
+    <div class="status-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">โหลดรูปภาพ...</span>
+    </div>
+  </div>
 
-        const roomSrc = localStorage.getItem('roomImage');
-        const tileSrc = localStorage.getItem('lastTexture');
+  <!-- RIGHT: Sidebar -->
+  <div class="sidebar">
 
-        // ฟังก์ชันวาด Canvas เบื้องต้น
-        async function renderPreview() {
-            if (!roomSrc || !tileSrc) {
-                alert("ไม่พบข้อมูลรูปห้องหรือลายกระเบื้อง");
-                return;
-            }
+    <div class="panel-header">
+      <h2>Room Preview</h2>
+      <p>เลือกพื้นที่พื้น แล้วปูกระเบื้อง</p>
+    </div>
 
-            const roomImg = new Image();
-            roomImg.crossOrigin = "anonymous";
-            roomImg.src = window.location.origin + roomSrc;
+    <!-- Step 1: Floor Selection -->
+    <div class="panel-section">
+      <h3>① เลือกพื้นที่พื้น</h3>
 
-            roomImg.onload = () => {
-                ctx.drawImage(roomImg, 0, 0, 800, 500);
+      <div class="instructions">
+        <ol>
+          <li>คลิกบนรูปเพื่อวางจุดรอบพื้น</li>
+          <li>วางอย่างน้อย 3 จุด</li>
+          <li>กด <b>"ปิดพื้นที่"</b> เมื่อครบ</li>
+        </ol>
+      </div>
 
-                const tileImg = new Image();
-                tileImg.crossOrigin = "anonymous";
-                tileImg.src = tileSrc.startsWith('http') ? tileSrc : window.location.origin + tileSrc;
+      <div class="btn-row" style="margin-top: 10px;">
+        <button class="btn btn-primary" id="btnClose" disabled onclick="closePolygon()">✓ ปิดพื้นที่</button>
+        <button class="btn btn-ghost" id="btnUndo" disabled onclick="undoPoint()">↩ Undo</button>
+        <button class="btn btn-danger" id="btnClear" disabled onclick="clearPolygon()">✕ ล้าง</button>
+      </div>
+    </div>
 
-                tileImg.onload = () => {
-                    ctx.save();
-                    ctx.globalAlpha = 0.5; // ปรับให้จางเพื่อให้เห็นห้อง
-                    const pattern = ctx.createPattern(tileImg, 'repeat');
-                    ctx.fillStyle = pattern;
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.restore();
-                };
-            };
+    <!-- Step 2: Tile Controls -->
+    <div class="panel-section">
+      <h3>② ปรับแต่งกระเบื้อง</h3>
+
+      <div class="tile-info">
+        <img id="tileThumb" class="tile-thumb" src="">
+        <div class="tile-info-text">
+          <strong>Generated Tile</strong>
+          <span id="tileSizeText">-</span>
+        </div>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label"><span>ขนาดกระเบื้อง</span><span id="scaleVal">1.0x</span></div>
+        <input type="range" id="tileScale" min="0.3" max="2.5" step="0.05" value="1">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label"><span>ความโปร่งใส</span><span id="opacityVal">85%</span></div>
+        <input type="range" id="tileOpacity" min="0.3" max="1" step="0.05" value="0.85">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label"><span>ความกว้างยาแนว</span><span id="groutVal">3px</span></div>
+        <input type="range" id="groutWidth" min="0" max="12" step="1" value="3">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label"><span>สียาแนว</span></div>
+        <div class="color-input-wrap">
+          <input type="color" id="groutColor" value="#2a2a2a">
+          <span style="font-size:12px;color:#888" id="groutHex">#2a2a2a</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Layout -->
+    <div class="panel-section">
+      <h3>③ รูปแบบการปู</h3>
+      <div class="layout-grid">
+        <div class="layout-option active" data-layout="grid" onclick="setLayout(this)">
+          <div class="icon">▦</div>Grid
+        </div>
+        <div class="layout-option" data-layout="brick" onclick="setLayout(this)">
+          <div class="icon">▧</div>Brick
+        </div>
+        <div class="layout-option" data-layout="herringbone" onclick="setLayout(this)">
+          <div class="icon">⧖</div>Herring
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Actions -->
+    <div class="sidebar-footer">
+      <button class="btn btn-success" onclick="downloadImage()" id="btnDownload" disabled>
+        💾 บันทึกรูปภาพ
+      </button>
+      <button class="btn btn-ghost" onclick="window.location.href='generator.html'">
+        ← กลับไปแก้ลาย
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   TILE AI — Interactive Polygon Floor Preview
+   ═══════════════════════════════════════════ */
+
+// ─── Canvas Setup ───
+const mainCanvas  = document.getElementById('mainCanvas');
+const mainCtx     = mainCanvas.getContext('2d');
+const overlay     = document.getElementById('overlayCanvas');
+const overlayCtx  = overlay.getContext('2d');
+const wrapper     = document.getElementById('canvasWrapper');
+
+// ─── State ───
+let roomImg       = null;
+let tileImg       = null;
+let points        = [];          // polygon vertices [{x,y}, ...]
+let polygonClosed = false;
+let scaleRatio    = 1;           // canvas pixel vs display pixel
+
+// ─── Settings ───
+let tileScale   = 1;
+let tileOpacity = 0.85;
+let groutWidth  = 3;
+let groutColor  = '#2a2a2a';
+let layoutMode  = 'grid';        // grid | brick | herringbone
+
+// ─── DOM refs ───
+const statusDot  = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+
+/* ═══ LOAD IMAGES ═══ */
+
+function init() {
+  const roomSrc = localStorage.getItem('roomImage');
+  const tileSrc = localStorage.getItem('lastTexture');
+
+  if (!roomSrc) {
+    setStatus('idle', 'ไม่พบรูปห้อง — กรุณาอัปโหลดก่อน');
+    return;
+  }
+
+  // Load room
+  roomImg = new Image();
+  roomImg.crossOrigin = 'anonymous';
+  roomImg.onload = () => {
+    // set canvas to image natural size (max 1200 wide)
+    const maxW = 1200;
+    const ratio = roomImg.naturalWidth > maxW ? maxW / roomImg.naturalWidth : 1;
+    mainCanvas.width  = Math.round(roomImg.naturalWidth * ratio);
+    mainCanvas.height = Math.round(roomImg.naturalHeight * ratio);
+    overlay.width     = mainCanvas.width;
+    overlay.height    = mainCanvas.height;
+
+    drawRoom();
+    updateScaleRatio();
+    setStatus('idle', 'คลิกบนรูปเพื่อเลือกพื้นที่พื้น');
+  };
+  roomImg.onerror = () => setStatus('idle', 'โหลดรูปห้องไม่ได้');
+  roomImg.src = roomSrc;
+
+  // Load tile
+  if (tileSrc) {
+    tileImg = new Image();
+    tileImg.crossOrigin = 'anonymous';
+    tileImg.onload = () => {
+      document.getElementById('tileThumb').src = tileImg.src;
+      document.getElementById('tileSizeText').textContent = tileImg.naturalWidth + ' × ' + tileImg.naturalHeight + ' px';
+      if (polygonClosed) renderTiles();
+    };
+    tileImg.src = tileSrc;
+  }
+}
+
+function updateScaleRatio() {
+  const displayW = mainCanvas.getBoundingClientRect().width;
+  scaleRatio = mainCanvas.width / displayW;
+}
+window.addEventListener('resize', updateScaleRatio);
+
+/* ═══ DRAW ROOM ═══ */
+function drawRoom() {
+  if (!roomImg) return;
+  mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+  mainCtx.drawImage(roomImg, 0, 0, mainCanvas.width, mainCanvas.height);
+}
+
+/* ═══ STATUS ═══ */
+function setStatus(state, text) {
+  statusDot.className = 'status-dot ' + state;
+  statusText.textContent = text;
+}
+
+/* ═══ POLYGON DRAWING ═══ */
+
+overlay.addEventListener('click', (e) => {
+  if (polygonClosed) return;  // already closed
+
+  const rect = overlay.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * scaleRatio;
+  const y = (e.clientY - rect.top)  * scaleRatio;
+
+  points.push({ x, y });
+  drawOverlay();
+  updateButtons();
+  setStatus('drawing', 'จุดที่ ' + points.length + ' — วางต่อหรือกด "ปิดพื้นที่"');
+});
+
+// Show cursor preview line
+overlay.addEventListener('mousemove', (e) => {
+  if (polygonClosed || points.length === 0) return;
+  drawOverlay();
+
+  const rect = overlay.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * scaleRatio;
+  const my = (e.clientY - rect.top)  * scaleRatio;
+
+  overlayCtx.beginPath();
+  overlayCtx.moveTo(points[points.length - 1].x, points[points.length - 1].y);
+  overlayCtx.lineTo(mx, my);
+  overlayCtx.strokeStyle = 'rgba(108,159,255,0.4)';
+  overlayCtx.lineWidth = 1.5;
+  overlayCtx.setLineDash([6, 4]);
+  overlayCtx.stroke();
+  overlayCtx.setLineDash([]);
+});
+
+function drawOverlay() {
+  overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+  if (points.length === 0) return;
+
+  // Draw filled area hint
+  if (points.length >= 3) {
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      overlayCtx.lineTo(points[i].x, points[i].y);
+    }
+    overlayCtx.closePath();
+    overlayCtx.fillStyle = polygonClosed ? 'rgba(108,159,255,0.08)' : 'rgba(108,159,255,0.12)';
+    overlayCtx.fill();
+  }
+
+  // Draw lines
+  overlayCtx.beginPath();
+  overlayCtx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    overlayCtx.lineTo(points[i].x, points[i].y);
+  }
+  if (polygonClosed) overlayCtx.closePath();
+  overlayCtx.strokeStyle = '#6c9fff';
+  overlayCtx.lineWidth = 2;
+  overlayCtx.stroke();
+
+  // Draw dots
+  points.forEach((p, i) => {
+    overlayCtx.beginPath();
+    overlayCtx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+    overlayCtx.fillStyle = i === 0 ? '#ff6b6b' : '#6c9fff';
+    overlayCtx.fill();
+    overlayCtx.strokeStyle = '#fff';
+    overlayCtx.lineWidth = 1.5;
+    overlayCtx.stroke();
+  });
+}
+
+/* ═══ POLYGON ACTIONS ═══ */
+
+function closePolygon() {
+  if (points.length < 3) return;
+  polygonClosed = true;
+  drawOverlay();
+  renderTiles();
+  updateButtons();
+  setStatus('done', 'ปูกระเบื้องเรียบร้อย! ปรับแต่งได้ที่แผงด้านขวา');
+}
+
+function undoPoint() {
+  if (polygonClosed) {
+    // reopen polygon
+    polygonClosed = false;
+    drawRoom();             // redraw room without tiles
+  }
+  points.pop();
+  drawOverlay();
+  updateButtons();
+  if (points.length === 0) {
+    setStatus('idle', 'คลิกบนรูปเพื่อเลือกพื้นที่พื้น');
+  } else {
+    setStatus('drawing', 'จุดที่ ' + points.length + ' — วางต่อหรือกด "ปิดพื้นที่"');
+  }
+}
+
+function clearPolygon() {
+  points = [];
+  polygonClosed = false;
+  overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+  drawRoom();
+  updateButtons();
+  setStatus('idle', 'คลิกบนรูปเพื่อเลือกพื้นที่พื้น');
+}
+
+function updateButtons() {
+  document.getElementById('btnClose').disabled = (points.length < 3 || polygonClosed);
+  document.getElementById('btnUndo').disabled  = (points.length === 0);
+  document.getElementById('btnClear').disabled = (points.length === 0);
+  document.getElementById('btnDownload').disabled = !polygonClosed;
+}
+
+/* ═══ TILE RENDERING ENGINE ═══ */
+
+function renderTiles() {
+  if (!polygonClosed || !tileImg || points.length < 3) return;
+
+  drawRoom(); // fresh room
+
+  const tileW = Math.round(tileImg.naturalWidth  * tileScale * 0.25);
+  const tileH = Math.round(tileImg.naturalHeight * tileScale * 0.25);
+  const gw = groutWidth;
+
+  mainCtx.save();
+
+  // ─ clip to polygon ─
+  mainCtx.beginPath();
+  mainCtx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    mainCtx.lineTo(points[i].x, points[i].y);
+  }
+  mainCtx.closePath();
+  mainCtx.clip();
+
+  // ─ get bounding box of polygon ─
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  points.forEach(p => {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  });
+
+  // ─ draw grout background ─
+  mainCtx.fillStyle = groutColor;
+  mainCtx.globalAlpha = tileOpacity;
+  mainCtx.fillRect(minX, minY, maxX - minX, maxY - minY);
+
+  // ─ draw tiles ─
+  const stepX = tileW + gw;
+  const stepY = tileH + gw;
+
+  for (let y = minY; y < maxY + stepY; y += stepY) {
+    const row = Math.floor((y - minY) / stepY);
+    for (let x = minX; x < maxX + stepX; x += stepX) {
+      let dx = x;
+      let dy = y;
+
+      if (layoutMode === 'brick' && row % 2 === 1) {
+        dx += stepX / 2;
+      }
+
+      if (layoutMode === 'herringbone') {
+        const col = Math.floor((x - minX) / stepX);
+        if ((row + col) % 2 === 0) {
+          mainCtx.save();
+          mainCtx.translate(dx + tileW / 2, dy + tileH / 2);
+          mainCtx.rotate(Math.PI / 4);
+          mainCtx.drawImage(tileImg, -tileW / 2, -tileH / 2, tileW, tileH);
+          mainCtx.restore();
+          continue;
         }
+      }
 
-        renderPreview();
+      mainCtx.drawImage(tileImg, dx, dy, tileW, tileH);
+    }
+  }
 
-        // ฟังก์ชันเรียก AI
-        async function renderWithAI() {
-            const aiBtn = document.getElementById('aiBtn');
-            
-            aiBtn.innerText = "กำลังประมวลผล...";
-            aiBtn.disabled = true;
+  // ─ overlay room image for shadow/depth blending ─
+  mainCtx.globalAlpha = 1 - tileOpacity;
+  mainCtx.globalCompositeOperation = 'multiply';
+  mainCtx.drawImage(roomImg, 0, 0, mainCanvas.width, mainCanvas.height);
 
-            try {
-                const response = await fetch("/api/ai-preview", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        roomImageUrl: roomSrc,
-                        tileImageUrl: tileSrc
-                    })
-                });
+  mainCtx.restore();
 
-                const data = await response.json();
-                
-                if (data.finalImage) {
-                    canvas.style.display = 'none';
-                    myImage.src = data.finalImage;
-                    myImage.style.display = 'block';
-                } else {
-                    alert("AI ไม่ได้ส่งรูปกลับมา ตรวจสอบการเชื่อมต่อ API");
-                }
-            } catch (err) {
-                console.error(err);
-                alert("AI ประมวลผลล้มเหลว ตรวจสอบ Server ของคุณ");
-            } finally {
-                aiBtn.innerText = "🪄 ปูพื้นด้วย AI (AI Smart Render)";
-                aiBtn.disabled = false;
-            }
-        }
+  // redraw polygon overlay on top
+  drawOverlay();
+}
 
-        // ฟังก์ชันดาวน์โหลดรูป
-        function downloadImage() {
-            const link = document.createElement('a');
-            link.download = 'tile-design-preview.png';
-            
-            // ถ้า AI โชว์รูปอยู่ ให้เซฟรูป AI ถ้าไม่ มีให้เซฟ Canvas
-            if (myImage.style.display === 'block') {
-                link.href = myImage.src;
-            } else {
-                link.href = canvas.toDataURL("image/png");
-            }
-            link.click();
-        }
-    </script>
+/* ═══ CONTROLS ═══ */
+
+document.getElementById('tileScale').addEventListener('input', (e) => {
+  tileScale = parseFloat(e.target.value);
+  document.getElementById('scaleVal').textContent = tileScale.toFixed(1) + 'x';
+  renderTiles();
+});
+
+document.getElementById('tileOpacity').addEventListener('input', (e) => {
+  tileOpacity = parseFloat(e.target.value);
+  document.getElementById('opacityVal').textContent = Math.round(tileOpacity * 100) + '%';
+  renderTiles();
+});
+
+document.getElementById('groutWidth').addEventListener('input', (e) => {
+  groutWidth = parseInt(e.target.value);
+  document.getElementById('groutVal').textContent = groutWidth + 'px';
+  renderTiles();
+});
+
+document.getElementById('groutColor').addEventListener('input', (e) => {
+  groutColor = e.target.value;
+  document.getElementById('groutHex').textContent = groutColor;
+  renderTiles();
+});
+
+function setLayout(el) {
+  document.querySelectorAll('.layout-option').forEach(o => o.classList.remove('active'));
+  el.classList.add('active');
+  layoutMode = el.dataset.layout;
+  renderTiles();
+}
+
+/* ═══ DOWNLOAD ═══ */
+
+function downloadImage() {
+  if (!polygonClosed) return;
+
+  // render final clean (without overlay dots)
+  renderTiles();
+
+  // hide overlay temporarily
+  const overlayData = overlayCtx.getImageData(0, 0, overlay.width, overlay.height);
+  overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+
+  // create download
+  const link = document.createElement('a');
+  link.download = 'TileAI-Preview-' + Date.now() + '.png';
+  link.href = mainCanvas.toDataURL('image/png');
+  link.click();
+
+  // restore overlay
+  overlayCtx.putImageData(overlayData, 0, 0);
+}
+
+/* ═══ INIT ═══ */
+init();
+</script>
 </body>
 </html>
